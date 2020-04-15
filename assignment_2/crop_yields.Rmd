@@ -12,7 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r packages, message=FALSE}
 # load packages
 library(tidyverse)
-
 ```
 
 ```{r}
@@ -22,21 +21,26 @@ clim <- read.table("../assignment_2/clim.txt")
 
 **1. Implement a model of almond yield anomaly (difference from average) in R based on this paper; You will be graded both on the “correctness” of the implementation and on “style”. Make sure you add some error checking. Use coefficients in the paper as default values, but make sure you can vary them. **
 
+**2. Have the function return almond yield anomaly for each year, and max and minimum yields over a time series of multiple year inputs**
+
 *Almond model from Lobell et al:*
 
-Y = -0.015Tn**2** - 0.0046Tn^2**2** - 0.07P**1** + 0.0043P^2**1** + 0.28
+Y = -0.015T<sub>n,2</sub> - 0.0046T<sup>2</sup><sub>n,2</sub> - 0.07P<sub>1</sub> + 0.0043P<sup>2</sup><sub>1</sub> + 0.28
 
 - Y: yield anomaly (ton/acre)
 - Tn: min temperature (degrees C)
 - Tx: maximum temperature
 - P: precipitation (mm)
-- bold numbers represent month of climate variable.
+- subscripted numbers represent month of climate variable.
   - So almond yields need min temp from feb and precipitation from jan
   
-```{r}
 
+```{r function}
+
+calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_param = -0.07, d_param = 0.0043, intercept = 0.28) {
+  
   # new dataframe of mean monthly min temp and monthly precipitation
- clim_month = clim %>% 
+  clim_month = clim %>% 
   group_by(year, month) %>% 
   summarize(meantmin = mean(tmin_c),
             precip=sum(precip)) %>% 
@@ -44,35 +48,11 @@ Y = -0.015Tn**2** - 0.0046Tn^2**2** - 0.07P**1** + 0.0043P^2**1** + 0.28
   
   # make an empty dataframe to put results in
   number_years = length(unique(clim_month$year))
-  crop = as.data.frame(matrix(nrow=number_years, ncol=4))
-  colnames(crop)=c("year","precip","tmin", "yield_anom")
-  
-  # for loop to go over every year
-  for (i in 1:length(unique(clim_month$year))){
-    
-    # fill in the year column 
-    crop$year[i] = unique(clim_month$year)[i]
-    
-    # choose specific month each year to extract min temp
-    crop$tmin[i] = 
-      
-    # choose specific month each year to precipitation
-    crop$precip[i] = 3
-    
-    # calculate yield anomaly
-    crop$yield_anom = -0.015*crop$tmin[i] - 0.0046*crop$tmin[i]^2 - 0.0043*crop$precip[i]^2 + 0.28
-  }
-
-
-  
-  
-  # make an empty dataframe to put results in
-  number_years = length(unique(clim_month$year))
-  crop = as.data.frame(matrix(nrow=number_years, ncol=4))
-  colnames(crop)=c("year","precip","tmin", "yield_anom")
+  crop = as.data.frame(matrix(nrow=number_years, ncol=2))
+  colnames(crop)=c("year","yield_anom")
  
    for (i in 1:length(unique(clim_month$year))){
-    
+    success = TRUE
     # fill in the year column 
     crop$year[i] = unique(clim_month$year)[i]
     
@@ -82,49 +62,58 @@ Y = -0.015Tn**2** - 0.0046Tn^2**2** - 0.07P**1** + 0.0043P^2**1** + 0.28
       filter(month == 2) %>% 
       select(meantmin) 
     
-    crop$tmin[i] = tmin_df[[1]]
+      # error checking that there is data for tmin for that year
+      if (nrow(tmin_df) != 1){
+        cat("Warning: Missing data for tmin in", unique(clim_month$year)[i], "\n")
+        success = FALSE
+      }
     
-   # choose specific month each year to precipitation
+    #choose specific month each year to precipitation
     precip_df <- clim_month %>% 
       filter(year == unique(clim_month$year)[i]) %>% 
       filter(month == 1) %>% 
       select(precip) 
     
-    crop$precip[i] = precip_df[[1]]
-
+      #error checking that there is data for precip for that year
+      if(nrow(precip_df) !=1){
+        cat("Warning: Missing data for precip in", unique(clim_month$year)[i], "\n")
+        success = FALSE
+      } else if(precip_df[[1]] < 0 ){ #error checking that precipitation is >= to 0
+        cat("Warning: Precip is less than 0 in", unique(clim_month$year)[i], "\n")
+        success = FALSE
+      }
+    
+    # calculate yield anomaly
+    if (success == TRUE) {
+      crop$yield_anom[i] = a_param*tmin_df[[1]] +
+                            b_param*tmin_df[[1]]^2 + 
+                            c_param*precip_df[[1]] +
+                            d_param*precip_df[[1]]^2 + 
+                            intercept
+    }
   }
   
-
+  max = crop %>% 
+    filter(yield_anom != "NA") %>% 
+    summarize(max_yield = max(yield_anom))
   
+  min = crop %>% 
+    filter(yield_anom != "NA") %>% 
+    summarize(min_yield = min(yield_anom))
   
-```
-
-for each year, take all the records for when year = this, select when month = 1 and select precip and when month = 2, select the precip and then put that into a new df with the year and make that a new df
-```{r function}
-
-calc_crop_yield = function(df = clim) {
-  
-  # new dataframe of mean monthly min temp and monthly precipitation
-  clim_month = clim %>% 
-  group_by(month, year) %>% 
-  summarize(meantmin = mean(tmin_c),
-            precip=sum(precip)) 
-  
-  # filter to months needed for crop yield equation
-  clim_month_need = clim_month %>% 
-    filter(month = c())
-  
-  # apply 
-  yield_anom = -0.015*tmin - 0.0046*tmin^2 - 0.0043*precip^2 + 0.28
-  
-  return(yield_anom)
+  return(list(data = crop, max = max[[1]], min = min[[1]]))
   
 }
 
 ```
 
 
-**2. Have the function return almond yield anomaly for each year, and max and minimum yields over a time series of multiple year inputs**
+```{r}
+
+calc_crop_yield(clim)
+
+```
+
 
 
 
