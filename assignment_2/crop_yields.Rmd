@@ -39,10 +39,10 @@ Y = -0.015T<sub>n,2</sub> - 0.0046T<sup>2</sup><sub>n,2</sub> - 0.07P<sub>1</sub
 #' calc_crop_yield
 #'
 #' @param df Climate data dataframe
-#' @param a_param 
-#' @param b_param 
-#' @param c_param 
-#' @param d_param 
+#' @param a_param crop paramater * temperature
+#' @param b_param crop paramater * temperature^2
+#' @param c_param crop paramater * precipitation
+#' @param d_param crop paramater * precipitation^2
 #' @param intercept 
 #' @param month_temp month of temperature data needed 
 #' @param month_precip month of precipitation data needed 
@@ -54,7 +54,7 @@ Y = -0.015T<sub>n,2</sub> - 0.0046T<sup>2</sup><sub>n,2</sub> - 0.07P<sub>1</sub
 
 calc_crop_yield = function(df, a_param = -0.015, b_param = -0.0046, 
                            c_param = -0.07, d_param = 0.0043, intercept = 0.28,
-                           month_temp == 2, month_precip == 1) {
+                           month_temp = 2, month_precip = 1) {
   
   # new dataframe of mean monthly min temp and monthly precipitation
   clim_month = df %>% 
@@ -140,10 +140,12 @@ ggplot(almond_yield, aes(x = year, y = yield_anom)) +
   geom_line() +
   labs(
     x = "Year",
-    y = "Crop Yield Anomaly (tons/acre)"
+    y = "Crop Yield Anomaly (tons/acre)",
+    title = "Almond Yield Anomaly"
   ) +
   scale_y_continuous() +
-  theme_classic(base_size = 15)
+  theme_classic(base_size = 15) +
+  theme(plot.title = element_text(hjust = 0.5)) 
 
 ```
 
@@ -164,10 +166,16 @@ ggplot(yield_2c, aes(x = year, y = yield_anom)) +
   geom_line() +
   labs(
     x = "Year",
-    y = "Crop Yield Anomaly (tons/acre)"
+    y = "Crop Yield Anomaly (tons/acre)",
+    title = "Almond Yield Anomaly with 2°C Warmer Climate"
   ) +
   scale_y_continuous() +
-  theme_classic(base_size = 15)
+  theme_classic(base_size = 15) +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+# Mean annual yield anomaly
+mean_annual = round(mean(yield_2c$yield_anom),2)
+mean_annual
 ```
 
 
@@ -179,11 +187,11 @@ ggplot(yield_2c, aes(x = year, y = yield_anom)) +
 clim_clean <- clim %>% 
   filter(year != 1988)
 
-# setting the normal distribution on the d parameter
+# setting the normal distribution on the b parameter
 b_par = rnorm(100, mean = -0.0046, sd = 0.1)
 b = as.data.frame(b_par) # make it a dataframe
 
-# run the function 100 times with all the selection of d parameters
+# run the function 100 times with all the selection of b parameters
 b$yield_anom_mean = NA
 b$yield_anom_mean_2c = NA
 for (i in 1:nrow(b)) {
@@ -206,11 +214,14 @@ boxplot_df <- b %>%
 
 ggplot(boxplot_df, aes(x = clim_type, y = yield_anomaly)) +
   geom_boxplot(aes(fill = clim_type), show.legend = FALSE) +
+  scale_fill_manual(values = c("darkolivegreen4", "deepskyblue4")) +
   labs(
     x = "Type of Climate Data",
-    y = "Mean Yield Anomaly"
+    y = "Crop Yield Anomaly (tons/acre)",
+    title = "Mean Annual Almond Yield Anomaly"
   ) +
-  theme_classic()
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) 
 
 ```
 
