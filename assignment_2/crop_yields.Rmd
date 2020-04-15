@@ -36,11 +36,28 @@ Y = -0.015T<sub>n,2</sub> - 0.0046T<sup>2</sup><sub>n,2</sub> - 0.07P<sub>1</sub
   
 
 ```{r function}
+#' calc_crop_yield
+#'
+#' @param df Climate data dataframe
+#' @param a_param 
+#' @param b_param 
+#' @param c_param 
+#' @param d_param 
+#' @param intercept 
+#' @param month_temp month of temperature data needed 
+#' @param month_precip month of precipitation data needed 
+#'
+#' @return dataframe of yield anomalies, 
+#' @export
+#'
+#' @examples
 
-calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_param = -0.07, d_param = 0.0043, intercept = 0.28) {
+calc_crop_yield = function(df, a_param = -0.015, b_param = -0.0046, 
+                           c_param = -0.07, d_param = 0.0043, intercept = 0.28,
+                           month_temp == 2, month_precip == 1) {
   
   # new dataframe of mean monthly min temp and monthly precipitation
-  clim_month = clim %>% 
+  clim_month = df %>% 
   group_by(year, month) %>% 
   summarize(meantmin = mean(tmin_c),
             precip=sum(precip)) %>% 
@@ -59,7 +76,7 @@ calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_par
     # choose specific month each year to extract min temp
     tmin_df <- clim_month %>% 
       filter(year == unique(clim_month$year)[i]) %>% 
-      filter(month == 2) %>% 
+      filter(month == month_temp) %>% 
       select(meantmin) 
     
       # error checking that there is data for tmin for that year
@@ -71,7 +88,7 @@ calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_par
     #choose specific month each year to precipitation
     precip_df <- clim_month %>% 
       filter(year == unique(clim_month$year)[i]) %>% 
-      filter(month == 1) %>% 
+      filter(month == month_precip) %>% 
       select(precip) 
     
       #error checking that there is data for precip for that year
@@ -84,6 +101,7 @@ calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_par
       }
     
     # calculate yield anomaly
+    # error check that it only calculates anomaly if both precip and temp data have values
     if (success == TRUE) {
       crop$yield_anom[i] = a_param*tmin_df[[1]] +
                             b_param*tmin_df[[1]]^2 + 
@@ -93,20 +111,16 @@ calc_crop_yield = function(df = clim, a_param = -0.015, b_param = -0.0046, c_par
     }
   }
   
-  max = crop %>% 
-    filter(yield_anom != "NA") %>% 
-    summarize(max_yield = max(yield_anom))
-  
-  min = crop %>% 
-    filter(yield_anom != "NA") %>% 
-    summarize(min_yield = min(yield_anom))
-  
-  return(list(data = crop, max = max[[1]], min = min[[1]]))
+  # calculate max and min crop yields and return function
+  return(list(data = crop, 
+              max = max(na.omit(crop$yield_anom)),
+              min = min(na.omit(crop$yield_anom))))
   
 }
 
 ```
 
+Test it on the clim dataset
 
 ```{r}
 
@@ -115,16 +129,88 @@ calc_crop_yield(clim)
 ```
 
 
-
-
 **3. With the climate data provided (clim.txt), *use your model* to estimate how almond yield anomalies for each year in the record - graph the results.**
 
+```{r}
+# get the dataframe
+almond_yield <- calc_crop_yield(clim)$data
+
+# graph the result
+ggplot(almond_yield, aes(x = year, y = yield_anom)) +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Crop Yield Anomaly (tons/acre)"
+  ) +
+  scale_y_continuous() +
+  theme_classic(base_size = 15)
+
+```
 
 
-**4. Use model to estimate  the mean annual yield anomaly if the last 20 years had been 2C warmer**
+**4. Use model to estimate the mean annual yield anomaly if the last 20 years had been 2C warmer**
 
+```{r}
+# add two degrees to temperature
+clim_2c <- clim %>% 
+  mutate(tmin_c = tmin_c + 2) %>% 
+  mutate(tmax_c = tmax_c + 2) %>% 
+  filter(year != 1988)
+   
+yield_2c <- calc_crop_yield(clim_2c)$data
+
+# graph the yield anomaly when 2c warmer
+ggplot(yield_2c, aes(x = year, y = yield_anom)) +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Crop Yield Anomaly (tons/acre)"
+  ) +
+  scale_y_continuous() +
+  theme_classic(base_size = 15)
+```
 
 
 **5. Vary one of the parameter by sampling from a normal distribution with mean the value from Lobell et al., (2006) and standard deviation 10% of the mean -  create a box plot of  mean annual yield anomaly for baseline and 2C climate (where boxes show variation due to uncertanty in the parameter) **
 
+```{r, message = FALSE}
+
+# take out 1988 from the clim dataframe to not show the error messages
+clim_clean <- clim %>% 
+  filter(year != 1988)
+
+# setting the normal distribution on the d parameter
+b_par = rnorm(100, mean = -0.0046, sd = 0.1)
+b = as.data.frame(b_par) # make it a dataframe
+
+# run the function 100 times with all the selection of d parameters
+b$yield_anom_mean = NA
+b$yield_anom_mean_2c = NA
+for (i in 1:nrow(b)) {
+  # regular temperatures
+  out <- calc_crop_yield(clim_clean, b_param = b$b_par[i])$data
+  mean <- mean(na.omit(out$yield_anom))
+  b$yield_anom_mean[i] = mean
+  
+  # 2 degrees warmer temperatures
+  out <- calc_crop_yield(clim_2c, b_param = b$b_par[i])$data
+  mean <- mean(na.omit(out$yield_anom))
+  b$yield_anom_mean_2c[i] = mean
+}
+```
+
+```{r}
+# make a boxplot of results
+boxplot_df <- b %>% 
+  gather(key = "clim_type", value ="yield_anomaly", -b_par)
+
+ggplot(boxplot_df, aes(x = clim_type, y = yield_anomaly)) +
+  geom_boxplot(aes(fill = clim_type), show.legend = FALSE) +
+  labs(
+    x = "Type of Climate Data",
+    y = "Mean Yield Anomaly"
+  ) +
+  theme_classic()
+
+```
 
