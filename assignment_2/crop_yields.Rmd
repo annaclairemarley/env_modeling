@@ -1,0 +1,141 @@
+---
+title: "Crop Yields"
+author: "AnnaClaire Marley"
+date: "4/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, message=FALSE}
+# load packages
+library(tidyverse)
+
+```
+
+```{r}
+# read in the data
+clim <- read.table("../assignment_2/clim.txt")
+```
+
+**1. Implement a model of almond yield anomaly (difference from average) in R based on this paper; You will be graded both on the “correctness” of the implementation and on “style”. Make sure you add some error checking. Use coefficients in the paper as default values, but make sure you can vary them. **
+
+*Almond model from Lobell et al:*
+
+Y = -0.015Tn**2** - 0.0046Tn^2**2** - 0.07P**1** + 0.0043P^2**1** + 0.28
+
+- Y: yield anomaly (ton/acre)
+- Tn: min temperature (degrees C)
+- Tx: maximum temperature
+- P: precipitation (mm)
+- bold numbers represent month of climate variable.
+  - So almond yields need min temp from feb and precipitation from jan
+  
+```{r}
+
+  # new dataframe of mean monthly min temp and monthly precipitation
+ clim_month = clim %>% 
+  group_by(year, month) %>% 
+  summarize(meantmin = mean(tmin_c),
+            precip=sum(precip)) %>% 
+  ungroup()
+  
+  # make an empty dataframe to put results in
+  number_years = length(unique(clim_month$year))
+  crop = as.data.frame(matrix(nrow=number_years, ncol=4))
+  colnames(crop)=c("year","precip","tmin", "yield_anom")
+  
+  # for loop to go over every year
+  for (i in 1:length(unique(clim_month$year))){
+    
+    # fill in the year column 
+    crop$year[i] = unique(clim_month$year)[i]
+    
+    # choose specific month each year to extract min temp
+    crop$tmin[i] = 
+      
+    # choose specific month each year to precipitation
+    crop$precip[i] = 3
+    
+    # calculate yield anomaly
+    crop$yield_anom = -0.015*crop$tmin[i] - 0.0046*crop$tmin[i]^2 - 0.0043*crop$precip[i]^2 + 0.28
+  }
+
+
+  
+  
+  # make an empty dataframe to put results in
+  number_years = length(unique(clim_month$year))
+  crop = as.data.frame(matrix(nrow=number_years, ncol=4))
+  colnames(crop)=c("year","precip","tmin", "yield_anom")
+ 
+   for (i in 1:length(unique(clim_month$year))){
+    
+    # fill in the year column 
+    crop$year[i] = unique(clim_month$year)[i]
+    
+    # choose specific month each year to extract min temp
+    tmin_df <- clim_month %>% 
+      filter(year == unique(clim_month$year)[i]) %>% 
+      filter(month == 2) %>% 
+      select(meantmin) 
+    
+    crop$tmin[i] = tmin_df[[1]]
+    
+   # choose specific month each year to precipitation
+    precip_df <- clim_month %>% 
+      filter(year == unique(clim_month$year)[i]) %>% 
+      filter(month == 1) %>% 
+      select(precip) 
+    
+    crop$precip[i] = precip_df[[1]]
+
+  }
+  
+
+  
+  
+```
+
+for each year, take all the records for when year = this, select when month = 1 and select precip and when month = 2, select the precip and then put that into a new df with the year and make that a new df
+```{r function}
+
+calc_crop_yield = function(df = clim) {
+  
+  # new dataframe of mean monthly min temp and monthly precipitation
+  clim_month = clim %>% 
+  group_by(month, year) %>% 
+  summarize(meantmin = mean(tmin_c),
+            precip=sum(precip)) 
+  
+  # filter to months needed for crop yield equation
+  clim_month_need = clim_month %>% 
+    filter(month = c())
+  
+  # apply 
+  yield_anom = -0.015*tmin - 0.0046*tmin^2 - 0.0043*precip^2 + 0.28
+  
+  return(yield_anom)
+  
+}
+
+```
+
+
+**2. Have the function return almond yield anomaly for each year, and max and minimum yields over a time series of multiple year inputs**
+
+
+
+**3. With the climate data provided (clim.txt), *use your model* to estimate how almond yield anomalies for each year in the record - graph the results.**
+
+
+
+**4. Use model to estimate  the mean annual yield anomaly if the last 20 years had been 2C warmer**
+
+
+
+**5. Vary one of the parameter by sampling from a normal distribution with mean the value from Lobell et al., (2006) and standard deviation 10% of the mean -  create a box plot of  mean annual yield anomaly for baseline and 2C climate (where boxes show variation due to uncertanty in the parameter) **
+
+
