@@ -1,0 +1,57 @@
+---
+title: "almond_master"
+author: "AnnaClaire Marley, Ted Jiang"
+date: "4/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+```{r}
+# Read in the data
+clim <- read.table("clim.txt")
+```
+
+```{r}
+source("almond_anomaly.R")
+
+baseline_result <- almond_anomaly(clim)
+mean_result <- almond_anomaly(clim, mean_only = TRUE)
+```
+
+# Testing error messages (all the code chunk with reture an error)
+```{r}
+#Create a df with unrealistic minimal temperature
+clim_1 <- clim %>% 
+  mutate(tmin_c = tmin_c - 200)
+
+test <- almond_anomaly(clim_1)
+```
+
+```{r}
+#Create a df with unrealistic maximum temperature
+clim_2 <- clim %>% 
+  mutate(tmax_c = tmax_c + 100)
+
+test <- almond_anomaly(clim_2)
+```
+
+```{r}
+#Create a df with wrong col names
+clim_3 <- clim %>% 
+  rename(tmax = tmax_c)
+
+test <- almond_anomaly(clim_3)
+```
+
+```{r}
+#Create a df with wrong year format
+clim_4 <- clim %>% 
+  mutate(month = "January")
+
+test <- almond_anomaly(clim_4)
+```
+
