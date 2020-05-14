@@ -1,0 +1,111 @@
+---
+title: "Forest Growth Model"
+author: "AnnaClaire Marley"
+date: "5/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+library(deSolve)
+```
+
+
+###**Model of forest growth (where forest size in measured in units of carbon (C)):**
+
+* dC/dt = 0 when air temperatures are below 0
+
+* dC/dt  = r*C for forests where carbon is below a canopy closure threshold 
+
+* dC/dt = g. for forests where carbon is above the threshold canopy closure
+
+* dC/dt = 0 once carrying capacity is reached.
+
+*The size of the forest (C), Canopy closure threshold and carrying capacity are all in units of carbon* 
+
+**Canopy closure threshold:** the size of the forest at which growth rates change from exponential to linear
+
+**r**: an early exponential growth rate 
+
+**g**: the linear growth rate 
+
+
+
+#### Run the model for 300 years (using the ODE solver)  starting with an initial forest size of 10 kg/C, and using the following parameters:
+
+* canopy closure threshold (canopy_close) of 100 kgC 
+
+* a carrying capacity (k) of 500 kg C
+
+* a early growth rate (r) of 0.01
+
+* a later growth rate (g) of 2 kg/year
+
+* an air temperature (temp) of 20C
+
+```{r}
+#### parameters ###
+years = seq(from=1, to=300, by=2)
+initial_forest = 10 # (kg C)
+canopy_close = 100 # (kg C)
+carry_capacity = 500 # (kg C)
+initial_growth = 0.01 # (kg/year)
+linear_growth = 2 # (kg/year)
+temp = 20 # degrees C
+
+# create parameter list
+parms = list(canopy_thresh = canopy_close, K = carry_capacity,
+             r = initial_growth, g = linear_growth, temp = temp)
+
+# source model
+source('../assignment_4/forest_growth.R')
+
+# run ODE model
+results = ode(y=initial_forest, times=years, func=forest_growth, parms=parms)
+colnames(results)=c("year","forest_carbon")
+head(results)
+
+```
+
+
+##### Graph the results
+
+```{r}
+ggplot(as.data.frame(results), aes(x = year, y = forest_carbon)) +
+  geom_line() +
+  labs(
+    x = "Years",
+    y = "Forest Size (kg C)"
+  ) +
+  theme_classic()
+
+```
+
+
+##### Run a sobol sensitivity analysis that explores how the estimated maximum forest size varies with early and later growth rates. 
+
+##### Graph the results of the sensitivity analysis as a box plot and a plot of the two sobol indices (S and T)
+
+
+```{r}
+
+# rate of forest growth 
+  carb_change = parms$r*C
+  
+  # forest growth is 0 when temperatures are below 0
+  carb_change = ifelse(parms$temp < 0, 0, carb_change)
+  
+  # forest growth is 0 when carrying capacity is reached 
+  carb_change = ifelse(carb_change >= parms$K, 0, carb_change)
+  
+  # forest growth becomes linear when carbon is above the threshold canopy closure
+  carb_change = ifelse(carb_change > parms$canopy_thresh, parms$g, carb_change)
+
+
+```
+
+
