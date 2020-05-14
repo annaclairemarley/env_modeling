@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, include = FALSE}
 library(tidyverse)
 library(deSolve)
+library(sensitivity)
 ```
 
 
@@ -88,24 +89,88 @@ ggplot(as.data.frame(results), aes(x = year, y = forest_carbon)) +
 
 ##### Run a sobol sensitivity analysis that explores how the estimated maximum forest size varies with early and later growth rates. 
 
-##### Graph the results of the sensitivity analysis as a box plot and a plot of the two sobol indices (S and T)
+```{r}
+
+# number of runs
+np=1000
+
+### generate two examples of random number from parmeter distributions ####
+
+  # naming parameters
+  r = rnorm(mean = 0.01, sd = 0.01/5, n=np)
+  g = rnorm(mean = 2, sd = 2/5, n=np)
+
+  # create dataframe
+  X1 = cbind.data.frame(r, g)
+  
+  ## repeat process for second dataframe
+  # naming parameters
+  r = rnorm(mean = 0.01, sd = 0.01/5, n=np)
+  g = rnorm(mean = 2, sd = 2/5, n=np)
+  
+  # create dataframe
+  X2 = cbind.data.frame(r, g)
+
+# run sobel sensitivity
+sens_sobel = sobol2007(model = NULL, X1, X2, nboot = 100)
+
+```
 
 
 ```{r}
+#### run model with parameters generated from sobel ###
 
-# rate of forest growth 
-  carb_change = parms$r*C
+# Create a function to compute the maximum forest size
+compute_metrics = function(result) {
+  maxsize = max(result$forest_size)
+  return(list(maxsize = maxsize))}
+
+# Define a wrapper function to run solver, compute metrics, and send back results for each parameter
+size_wrapper = function(time, C , r, g, func){
+  parms = list(canopy_thresh = 100, K = 500,
+             r = r, g = g, temp = 20)
+  result = ode(y = C, times = time, func = func, parms = parms)
+  colnames(result)=c("year","forest_size")
+  metrics=compute_metrics(as.data.frame(result))
   
-  # forest growth is 0 when temperatures are below 0
-  carb_change = ifelse(parms$temp < 0, 0, carb_change)
-  
-  # forest growth is 0 when carrying capacity is reached 
-  carb_change = ifelse(carb_change >= parms$K, 0, carb_change)
-  
-  # forest growth becomes linear when carbon is above the threshold canopy closure
-  carb_change = ifelse(carb_change > parms$canopy_thresh, parms$g, carb_change)
+  return(metrics)
+}
+
+# apply functions 
+allresults = mapply(FUN=size_wrapper, r=sens_sobel$X$r, g=sens_sobel$X$g,
+                    MoreArgs=list(C = initial_forest, time = years, func=forest_growth))
+
+
+allres = as.data.frame(matrix(unlist(allresults), ncol=1, byrow=T))
+colnames(allres) = c("maxsize")
 
 
 ```
 
 
+##### Graph the results of the sensitivity analysis as a box plot 
+
+```{r}
+
+# create boxplots
+ggplot(allres, aes(y = maxsize))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Maximum Forest Size (kgC)")
+
+```
+
+##### Plot of the two sobol indices (S and T)
+
+```{r}
+# Tell sobel model the result
+sens_size_maxsize = sensitivity::tell(sens_sobel, allres$maxsize)
+
+# First-order indices
+sens_size_maxsize$S
+
+# Total sensitivity index
+sens_size_maxsize$T
+
+plot(sens_size_maxsize)
+```
