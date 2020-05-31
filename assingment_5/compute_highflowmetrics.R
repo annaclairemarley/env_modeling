@@ -1,4 +1,11 @@
-
+#' compute_highflowmetrics
+#'
+#' Compute the average monthly absolute error 
+#'
+#' @param m model estimates
+#' @param o observations
+#' @param month month
+#' @param wy water year
 
 compute_highflowmetrics = function(m,o, month, wy) {
   

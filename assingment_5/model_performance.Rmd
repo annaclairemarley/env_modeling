@@ -119,21 +119,13 @@ res2 <- sagerm %>%
 
 # look at range of results
 res2_df <- as.data.frame(matrix(unlist(res2), byrow = F, ncol = 1))
+res2_df$setid = seq(from=1,to=nrow(res2_df))
 
-# find the parameter set that has the highest value
-best_par_setid = results$setid[which.max(results$combined)]
+# find the parameter set that has the lowest root mean square error
+best_par_setid = res2_df$setid[which.min(res2_df$V1)]
+best_par_setid
 
-# select that streamflow and then plot
-# use log y axis because we are interested in low flows
-msagel$best = ifelse(msagel$setid == best_par_setid, TRUE, FALSE)
-ggplot(subset(msagel, wy < 1970), aes(as.Date(date), streamflow, col=best))+
-  geom_line() +
- geom_line(aes(as.Date(date), obs), col="cyan")+scale_y_continuous(trans="log")
-
-# check how mean of annual minimum flow changes with calibration
-annual_min_all$best = ifelse(annual_min_all$setid == best_par_setid, TRUE, FALSE)
-
-annual_min_all %>% group_by(best) %>% summarize(mean=mean(minstr), meano=mean(minstro))
 ```
 
+Parameter set 32 has the best perforamnce. 
 
