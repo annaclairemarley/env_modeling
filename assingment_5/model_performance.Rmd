@@ -117,15 +117,13 @@ res2 <- sagerm %>%
   apply(2, FUN=rmse, 
         o=sager$obs)
 
-# look at range of results
-res2_df <- as.data.frame(matrix(unlist(res2), byrow = F, ncol = 1))
-res2_df$setid = seq(from=1,to=nrow(res2_df))
 
 # find the parameter set that has the lowest root mean square error
-best_par_setid = res2_df$setid[which.min(res2_df$V1)]
-best_par_setid
+errors <- unlist(res2)
+error_df <- data.frame(error=sort(errors, decreasing=FALSE))
+
 
 ```
 
-Parameter set 32 has the best perforamnce. 
+Parameter set V130 has the best perforamnce. 
 
