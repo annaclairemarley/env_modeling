@@ -92,7 +92,7 @@ ggplot(as.data.frame(results), aes(x = year, y = forest_carbon)) +
 ```{r}
 
 # number of runs
-np=1000
+np=10000
 
 ### generate two examples of random number from parmeter distributions ####
 

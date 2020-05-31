@@ -1,0 +1,139 @@
+---
+title: "Evaluating Model Performance"
+author: "AnnaClaire Marley"
+date: "5/31/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+# packages
+library(tidyverse)
+library(chron)
+library(data.table)
+```
+
+
+#### 1) Write a function to evaluate the performance of a streamflow model (apply to sager.txt ~ results of a hydrologic model applied to a Sierra watershed)
+
+**Function (compute_highflowmetrics())**
+
+* This function breaks down average mean error of observed and modeled maximum streamflow for each month 
+
+```{r}
+# read in data
+sager = read.table("../assingment_5/sager.txt", header=T)
+```
+
+```{r}
+source('../assingment_5/compute_highflowmetrics.R')
+
+# run model evaluation
+highflow_list <- compute_highflowmetrics(m=sager$model, o=sager$obs, 
+                                       month=sager$month, wy=sager$wy)
+
+# extract information from list and make dataframe
+highflow_df <- as.data.frame(matrix(unlist(highflow_list), byrow = F, ncol = 1))
+colnames(highflow_df) = c("mean_error")
+
+# add months back in
+highflow_df <- highflow_df %>% 
+  mutate(month = rep(c(1:12)))
+
+# plot average error each month
+ggplot(highflow_df, aes(x = month, y = mean_error)) +
+  geom_col(fill = "lightblue") +
+  labs(
+    x = "Month",
+    y = "Mean Error",
+    title = "Maximum Monthly Stream Flow Error Averaged from (1965-1990) "
+  ) +
+  scale_x_continuous(breaks = seq(1,12,by=1))+
+  theme_classic()
+
+```
+
+
+#### 2) Apply to all the columns in sagerm.txt
+
+```{r}
+# read in data
+sagerm = read.table("../assingment_5/sagerm.txt", header=T)
+
+# make start date same as sager
+sagerm$month = sager$month
+sagerm$wy = sager$wy
+
+```
+
+```{r}
+# use apply to compute for all the data
+res <- sagerm %>% 
+  select(-month, -wy ) %>% 
+  apply(2, FUN=compute_highflowmetrics, 
+        o=sager$obs, month = sagerm$month, wy=sagerm$wy)
+
+```
+
+Show how you applied your function and summarize the range of model performance (e.g range of values for your performance metric)
+
+```{r}
+# look at range of results
+res_df <- as.data.frame(matrix(unlist(res), byrow = F, ncol = 1))
+colnames(res_df) = c("mean_error")
+
+# add months back in
+res_df <- res_df %>% 
+  mutate(month = rep(c(1:12), times = 101)) 
+
+# graph range of performance measures
+ggplot(res_df, aes(month, mean_error))+
+  geom_boxplot(aes(group = month))+
+  labs(
+    x = "Month",
+    y = "Mean Error",
+    title = "Range of Maximum Monthly Streamflow Absolute Error Across Parameter Sets"
+  ) +
+  scale_x_continuous(breaks = seq(1,12,by=1))+
+  theme_classic()
+
+
+```
+
+Which parameter set has the best performance?
+
+To select the parameter with the best performance, I am using a root mean squared error function. This is essentially what I did by month, but makes it easier to rank the parameter sets. 
+
+```{r}
+
+source("../assingment_5/rmse.R")
+
+# use apply to compute for all the data
+res2 <- sagerm %>% 
+  select(-month, -wy ) %>% 
+  apply(2, FUN=rmse, 
+        o=sager$obs)
+
+# look at range of results
+res2_df <- as.data.frame(matrix(unlist(res2), byrow = F, ncol = 1))
+
+# find the parameter set that has the highest value
+best_par_setid = results$setid[which.max(results$combined)]
+
+# select that streamflow and then plot
+# use log y axis because we are interested in low flows
+msagel$best = ifelse(msagel$setid == best_par_setid, TRUE, FALSE)
+ggplot(subset(msagel, wy < 1970), aes(as.Date(date), streamflow, col=best))+
+  geom_line() +
+ geom_line(aes(as.Date(date), obs), col="cyan")+scale_y_continuous(trans="log")
+
+# check how mean of annual minimum flow changes with calibration
+annual_min_all$best = ifelse(annual_min_all$setid == best_par_setid, TRUE, FALSE)
+
+annual_min_all %>% group_by(best) %>% summarize(mean=mean(minstr), meano=mean(minstro))
+```
+
+
